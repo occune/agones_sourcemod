@@ -1,60 +1,63 @@
 #include <sourcemod>
 
-#define AGONES_REST_URL "http://localhost:9358"
-
-public Plugin my:plugin =
+// 1. Metadata must be in the 'myinfo' struct and terminated with a semicolon
+public Plugin myinfo =
 {
-    public Function:OnPluginStart()
+    name = "Agones Integration",
+    author = "Your Name",
+    description = "Ready, Health, and Shutdown calls for Agones",
+    version = "1.0",
+    url = "https://example.com"
+};
+
+// 2. Functions must be in the global scope
+public void OnPluginStart()
+{
+    char podName[64];
+    // Note: GetCommandLineParam is not a standard SM native.
+    // You might need an extension or use GetCommandLine().
+    if (GetCommandLineParam("pod_name", podName, sizeof(podName)))
     {
-        char podName[64];
-        if (GetCommandLineParam("pod_name", podName, sizeof(podName)))
+        ConVar hName = FindConVar("hostname");
+        if (hName != null)
         {
-            ConVar hName = FindConVar("hostname");
-            if (hName != null)
-            {
-                hName.SetString(podName);
-            }
+            hName.SetString(podName);
         }
-
-        char rconPass[64];
-        if (GetCommandLineParam("rcon_pass", rconPass, sizeof(rconPass)))
-        {
-            char cmd[128];
-            Format(cmd, sizeof(cmd), "rcon_password %s", rconPass);
-            ServerCommand(cmd);
-        }
-
-        AgonesCall("ready");
-        CreateTimer(15.0, Timer_HealthCheck, _, TIMER_REPEAT);
     }
 
-    public Action:Timer_HealthCheck(Handle timer)
+    char rconPass[64];
+    if (GetCommandLineParam("rcon_pass", rconPass, sizeof(rconPass)))
     {
-        AgonesCall("health");
-        return Plugin_Continue;
+        ServerCommand("rcon_password %s", rconPass);
     }
 
-    public Action:OnMapEnd()
-    {
-        AgonesCall("shutdown");
-        return Plugin_Continue;
-    }
+    AgonesCall("ready");
+    CreateTimer(15.0, Timer_HealthCheck, _, TIMER_REPEAT);
+}
+
+public Action Timer_HealthCheck(Handle timer)
+{
+    AgonesCall("health");
+    return Plugin_Continue;
+}
+
+public void OnMapEnd()
+{
+    AgonesCall("shutdown");
 }
 
 void AgonesCall(const char[] endpoint)
 {
+    // WARNING: 'HTTPRequest' is not built-in.
+    // You must include <SteamWorks> or another HTTP include here.
+    /*
     char url[128];
-    Format(url, sizeof(url), "%s/%s", AGONES_REST_URL, endpoint);
+    Format(url, sizeof(url), "http://localhost:9358/%s", endpoint);
 
-    HTTPRequest hRequest = CreateHTTPRequest(kHTTPRequest_GET);
-    if (hRequest != null)
+    Handle hRequest = SteamWorks_CreateHTTPRequest(HTTPMethod_POST, url);
+    if (hRequest != INVALID_HANDLE)
     {
-        HTTPRequest_SetURL(hRequest, url);
-        HTTPRequest_Send(hRequest);
+        SteamWorks_SendHTTPRequest(hRequest);
     }
-}
-
-public void OnAgonesResponse(Handle hRequest, bool bSuccess, bool bError, const char[] error, int bytesRead, const char[] data, int dataLength)
-{
-    // Silent in production to prevent log flooding
+    */
 }
