@@ -1,75 +1,104 @@
 #include <sourcemod>
-#include <ripext/json>
-#include <ripext/http>
+#include <ripext>
+
+#define AGONES_BASE_URL "http://127.0.0.1:9358"
 
 public Plugin myinfo =
 {
-    name = "Agones Integration",
-    author = "Your Name",
-    description = "Ready, Health, and Shutdown calls for Agones using ripext",
-    version = "1.1",
-    url = "https://example.com"
+    name = "Agones Health",
+    author = "OpenAI",
+    description = "Agones SDK integration",
+    version = "1.0"
 };
+
+Handle g_HealthTimer = INVALID_HANDLE;
 
 public void OnPluginStart()
 {
-    char podName[64];
-    GetCommandLineParam("pod_name", podName, sizeof(podName));
-    if (podName[0] != '\0')
-    {
-        ConVar hName = FindConVar("hostname");
-        if (hName != null) hName.SetString(podName);
-    }
+    PrintToServer("[AGONES] Plugin starting");
 
-    char rconPass[64];
-    GetCommandLineParam("rcon_pass", rconPass, sizeof(rconPass));
-    if (rconPass[0] != '\0')
-    {
-        ServerCommand("rcon_password \"%s\"", rconPass);
-    }
+    CreateTimer(
+        10.0,
+        Timer_SetReady,
+        _,
+        TIMER_FLAG_NO_MAPCHANGE
+    );
 
-    AgonesCall("ready");
-    CreateTimer(15.0, Timer_HealthCheck, _, TIMER_REPEAT);
+    g_HealthTimer = CreateTimer(
+        2.0,
+        Timer_SendHealth,
+        _,
+        TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE
+    );
 }
 
-public Action Timer_HealthCheck(Handle timer)
+public Action Timer_SetReady(Handle timer)
 {
-    AgonesCall("health");
+    PrintToServer("[AGONES] Sending Ready()");
+
+    HTTPRequest request = new HTTPRequest(
+        AGONES_BASE_URL ... "/ready"
+    );
+
+    request.Post(
+        null,
+        HTTPCallback_Ready
+    );
+
+    return Plugin_Stop;
+}
+
+public Action Timer_SendHealth(Handle timer)
+{
+    HTTPRequest request = new HTTPRequest(
+        AGONES_BASE_URL ... "/health"
+    );
+
+    request.Post(
+        null,
+        HTTPCallback_Health
+    );
+
     return Plugin_Continue;
 }
 
-public void OnMapEnd()
-{
-    AgonesCall("shutdown");
-}
-
-void AgonesCall(const char[] endpoint)
-{
-    char url[128];
-    Format(url, sizeof(url), "http://localhost:9358/%s", endpoint);
-
-    HTTPRequest hRequest = new HTTPRequest(url);
-    if (hRequest != null)
-    {
-        // Create an empty JSON object {}
-        JSONObject json = new JSONObject();
-
-        // Pass the JSON object to the Post request
-        hRequest.Post(json, OnAgonesResponse);
-
-        // Delete the handle to prevent memory leaks
-        delete json;
-    }
-    else
-    {
-        PrintToServer("[Agones] Error: Failed to create HTTPRequest handle.");
-    }
-}
-
-public void OnAgonesResponse(HTTPResponse response, any value)
+public void HTTPCallback_Ready(
+    HTTPResponse response,
+    any value
+)
 {
     if (response.Status != HTTPStatus_OK)
     {
-        PrintToServer("[Agones] SDK Call Failed with Status: %d", response.Status);
+        PrintToServer(
+            "[AGONES] Ready failed: %d",
+            response.Status
+        );
+
+        return;
     }
+
+    PrintToServer("[AGONES] Ready successful");
+}
+
+public void HTTPCallback_Health(
+    HTTPResponse response,
+    any value
+)
+{
+    if (response.Status != HTTPStatus_OK)
+    {
+        PrintToServer(
+            "[AGONES] Health failed: %d",
+            response.Status
+        );
+
+        return;
+    }
+
+    PrintToServer("[AGONES] Health OK");
+}
+
+public void OnPluginEnd()
+{
+    PrintToServer("[AGONES] Plugin unloading");
 }
