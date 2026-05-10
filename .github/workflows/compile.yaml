@@ -1,0 +1,12 @@
+name: Build SourcePawn
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Compile SourcePawn
+        uses: spiretf/spcomp@v0.1.0
+        with:
+          source: './agones_sdk.sp'
+          target: './agones_sdk.smx'
