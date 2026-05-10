@@ -1,94 +1,61 @@
 #include <sourcemod>
 #include <ripext>
 
-#define AGONES_BASE_URL "http://127.0.0.1:9358"
+// Since we are using the older HTTPClient, we define a global client
+HTTPClient g_httpClient;
 
 public Plugin myinfo =
 {
-    name = "Agones Health",
-    author = "OpenAI",
-    description = "Agones SDK integration",
+    name = "Agones Health Legacy",
+    author = "Adaptive Collaborator",
+    description = "Agones SDK integration using legacy HTTPClient",
     version = "1.0"
 };
 
-Handle g_HealthTimer = INVALID_HANDLE;
-
 public void OnPluginStart()
 {
-    PrintToServer("[AGONES] Plugin starting");
+    PrintToServer("[AGONES] Plugin starting using legacy HTTPClient");
 
-    CreateTimer(
-        10.0,
-        Timer_SetReady,
-        _,
-        TIMER_FLAG_NO_MAPCHANGE
-    );
+    // Initialize the client pointing to the Agones Sidecar
+    g_httpClient = new HTTPClient("http://127.0.0.1:9358");
 
-    g_HealthTimer = CreateTimer(
-        2.0,
-        Timer_SendHealth,
-        _,
-        TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE
-    );
+    // Send Ready after 10 seconds
+    CreateTimer(10.0, Timer_SetReady, _, TIMER_FLAG_NO_MAPCHANGE);
+
+    // Send Health every 2 seconds
+    CreateTimer(2.0, Timer_SendHealth, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action Timer_SetReady(Handle timer)
 {
-    char url[256];
-    Format(url, sizeof(url), "%s/ready", AGONES_BASE_URL);
+    PrintToServer("[AGONES] Sending Ready()");
 
-    HTTPRequest request = new HTTPRequest(url);
-    request.Post(null, HTTPCallback_Ready);
+    // In legacy RIPExt, Post takes (endpoint, data, callback)
+    // We pass 'null' for data as /ready is a simple trigger
+    g_httpClient.Post("ready", null, OnAgonesResponse);
+
     return Plugin_Stop;
 }
 
 public Action Timer_SendHealth(Handle timer)
 {
-    char url[256];
-    Format(url, sizeof(url), "%s/health", AGONES_BASE_URL);
+    // PrintToServer("[AGONES] Sending Health()");
+    g_httpClient.Post("health", null, OnAgonesResponse);
 
-    HTTPRequest request = new HTTPRequest(url);
-    request.Post(null, HTTPCallback_Health);
     return Plugin_Continue;
 }
 
-public void HTTPCallback_Ready(
-    HTTPResponse response,
-    any value
-)
+public void OnAgonesResponse(HTTPResponse response, any value)
 {
     if (response.Status != HTTPStatus_OK)
     {
-        PrintToServer(
-            "[AGONES] Ready failed: %d",
-            response.Status
-        );
-
+        PrintToServer("[AGONES] Request failed with status: %d", response.Status);
         return;
     }
-
-    PrintToServer("[AGONES] Ready successful");
-}
-
-public void HTTPCallback_Health(
-    HTTPResponse response,
-    any value
-)
-{
-    if (response.Status != HTTPStatus_OK)
-    {
-        PrintToServer(
-            "[AGONES] Health failed: %d",
-            response.Status
-        );
-
-        return;
-    }
-
-    PrintToServer("[AGONES] Health OK");
 }
 
 public void OnPluginEnd()
 {
-    PrintToServer("[AGONES] Plugin unloading");
+    // Clean up the handle
+    delete g_httpClient;
 }
