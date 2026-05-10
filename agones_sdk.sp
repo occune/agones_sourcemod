@@ -34,31 +34,21 @@ public void OnPluginStart()
 
 public Action Timer_SetReady(Handle timer)
 {
-    PrintToServer("[AGONES] Sending Ready()");
+    char url[256];
+    Format(url, sizeof(url), "%s/ready", AGONES_BASE_URL);
 
-    HTTPRequest request = new HTTPRequest(
-        AGONES_BASE_URL ... "/ready"
-    );
-
-    request.Post(
-        null,
-        HTTPCallback_Ready
-    );
-
+    HTTPRequest request = new HTTPRequest(url);
+    request.Post(null, HTTPCallback_Ready);
     return Plugin_Stop;
 }
 
 public Action Timer_SendHealth(Handle timer)
 {
-    HTTPRequest request = new HTTPRequest(
-        AGONES_BASE_URL ... "/health"
-    );
+    char url[256];
+    Format(url, sizeof(url), "%s/health", AGONES_BASE_URL);
 
-    request.Post(
-        null,
-        HTTPCallback_Health
-    );
-
+    HTTPRequest request = new HTTPRequest(url);
+    request.Post(null, HTTPCallback_Health);
     return Plugin_Continue;
 }
 
