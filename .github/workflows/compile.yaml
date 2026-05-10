@@ -1,11 +1,16 @@
-name: Build SourcePawn
-on: [push]
+name: Build sourcepawn and commit
+
+on:
+  push:
+    paths:
+      - '**.sp'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Compile SourcePawn
+      - name: Compile sourcepawn
         uses: spiretf/spcomp@v0.1.0
         with:
           source: './agones_sdk.sp'
